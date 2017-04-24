@@ -1,0 +1,49 @@
+version: "2"
+
+services:
+
+  eureka:
+    image: netflixoss/eureka:1.3.1
+    ports:
+      - "10000:8080"
+  dynamodb:
+    ports:
+      - "8001:8000"
+    image: schibstedspain/dynamodb-local
+    volumes:
+        - ./zuul:/zuul
+    environment:
+      AWS_ACCESS_KEY_ID: AAKI
+      AWS_SECRET_ACCESS_KEY: secret
+      AWS_DEFAULT_REGION: us-west-2
+    entrypoint: /bin/bash
+    command: -c "/zuul/startDynamoAndCreatePropertiesTable.sh"
+  zuul:
+    image: ramonibz/zuul
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    links:
+      - dynamodb
+      - eureka
+    environment:
+      - AWS_ACCESS_KEY_ID=xx
+      - AWS_SECRET_KEY=xxx
+    depends_on:
+      - eureka
+      - dynamodb
+  nginx:
+      image: padilo/nginx-ssl-proxy:auto-gen-certs
+      ports:
+        - "443:443"
+      environment:
+        - "ENABLE_SSL=true"
+        - "TARGET_SERVICE=zuul:8080"
+        - "ENABLE_AUTO_CERTS=true"
+      volumes:
+        - "ssl_data:/etc/secrets"
+      links:
+        - zuul
+
+volumes:
+  ssl_data:
